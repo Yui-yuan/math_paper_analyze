@@ -48,10 +48,10 @@ models:
 
   # 如果你有 Anthropic/OpenAI key，可以换成:
   # preprocess: "anthropic/claude-haiku-4-5-20251001"
-  # extract: "anthropic/claude-sonnet-4-20250514"
-  # critique: "anthropic/claude-opus-4-20250115"
-  # synthesize: "anthropic/claude-sonnet-4-20250514"
-  # interactive: "anthropic/claude-sonnet-4-20250514"
+  # extract: "anthropic/claude-sonnet-4-6"
+  # critique: "anthropic/claude-opus-4-6"
+  # synthesize: "anthropic/claude-sonnet-4-6"
+  # interactive: "anthropic/claude-sonnet-4-6"
 
 # 数学领域 (留空则不启用领域增强)
 # 可选: algebraic_geometry, number_theory, pde, topology, probability,

@@ -148,7 +148,7 @@ python main.py [论文路径] [选项]
 | `--max-rounds` | `-r` | 最大自迭代轮数 | `-r 5` |
 | `--no-interactive` | | 跳过研讨模式，直接输出笔记后退出 | |
 | `--model-extract` | | Stage 1（提取）使用的模型 | `--model-extract openai/gpt-4o` |
-| `--model-critique` | | Stage 2（批判）使用的模型 | `--model-critique anthropic/claude-opus-4-20250115` |
+| `--model-critique` | | Stage 2（批判）使用的模型 | `--model-critique anthropic/claude-opus-4-6` |
 | `--model-synthesize` | | Stage 3（修正）使用的模型 | `--model-synthesize openai/gpt-4o` |
 | `--list-domains` | | 列出所有可用的数学领域 | |
 | `--list-papers` | | 列出 `papers/` 目录下所有论文文件 | |
@@ -172,7 +172,7 @@ python main.py paper.pdf -d pde -l zh
 python main.py paper.pdf -f both
 
 # 用 OpenAI 模型做提取，Anthropic 做批判
-python main.py paper.pdf --model-extract openai/gpt-4o --model-critique anthropic/claude-opus-4-20250115
+python main.py paper.pdf --model-extract openai/gpt-5.4 --model-critique anthropic/claude-opus-4-6
 
 # 增加迭代轮数（更精细，但更费 token）
 python main.py paper.pdf -r 5
@@ -256,18 +256,20 @@ models:
 |------|------|------|---------|
 | DeepSeek Chat | `deepseek/deepseek-chat` | 便宜好用 | ¥1/M tokens |
 | DeepSeek Reasoner | `deepseek/deepseek-reasoner` | 推理强 | ¥4/M tokens |
-| Moonshot 128k | `moonshot/moonshot-v1-128k` | 超长上下文 | ¥60/M tokens |
-| MiniMax Text | `minimax/MiniMax-Text-01` | 便宜 | ¥1/M tokens |
-| Claude Opus 4 | `anthropic/claude-opus-4-20250115` | 最强 | $15/M tokens |
-| Claude Sonnet 4 | `anthropic/claude-sonnet-4-20250514` | 平衡 | $3/M tokens |
-| Claude Haiku 4.5 | `anthropic/claude-haiku-4-5-20251001` | 快速 | $0.8/M tokens |
-| GPT-4o | `openai/gpt-4o` | OpenAI 主力 | $2.5/M tokens |
-| GPT-4o mini | `openai/gpt-4o-mini` | 便宜 | $0.15/M tokens |
-| Gemini 2.5 Pro | `gemini/gemini-2.5-pro` | Google 最强，100万上下文 | $1.25/M tokens |
-| Gemini 2.5 Flash | `gemini/gemini-2.5-flash` | 快速便宜 | $0.15/M tokens |
-| Gemini 2.0 Flash | `gemini/gemini-2.0-flash` | 最便宜 | $0.10/M tokens |
+| Kimi K2.5 | `moonshot/kimi-k2.5` | 原生多模态，1T MoE，256K 上下文 | ¥60/M tokens |
+| MiniMax M2.7 | `minimax/MiniMax-M2.7` | 便宜 | $0.3/$1.2 per MTok |
+| Claude Opus 4.6 | `anthropic/claude-opus-4-6` | 最强，1M上下文 | $5/$25 per MTok |
+| Claude Sonnet 4.6 | `anthropic/claude-sonnet-4-6` | 平衡，1M上下文 | $3/$15 per MTok |
+| Claude Haiku 4.5 | `anthropic/claude-haiku-4-5-20251001` | 快速 | $1/$5 per MTok |
+| GPT-5.4 | `openai/gpt-5.4` | OpenAI 主力 | $2.5/$15 per MTok |
+| GPT-5.4 mini | `openai/gpt-5.4-mini` | 便宜 | $0.75/$4.5 per MTok |
+| Gemini 3.1 Pro | `gemini/gemini-3.1-pro-preview` | Google 最新最强（preview） | $2/$4 per MTok |
+| Gemini 3.1 Flash-Lite | `gemini/gemini-3.1-flash-lite-preview` | 最新轻量（preview） | $0.25/$0.50 per MTok |
+| Gemini 2.5 Pro | `gemini/gemini-2.5-pro` | 稳定版旗舰，1M上下文 | $1.25/$10 per MTok |
+| Gemini 2.5 Flash | `gemini/gemini-2.5-flash` | 快速便宜 | $0.30/$1.00 per MTok |
+| Gemini 2.5 Flash-Lite | `gemini/gemini-2.5-flash-lite` | 最便宜 | $0.10/$0.40 per MTok |
 
-**省钱建议**：默认配置使用 DeepSeek，全流程跑完一篇论文大约 ¥0.1-0.5。如果追求最高质量，批判阶段换成 `anthropic/claude-opus-4-20250115` 或 `openai/o3`。
+**省钱建议**：默认配置使用 DeepSeek，全流程跑完一篇论文大约 ¥0.1-0.5。如果追求最高质量，批判阶段换成 `anthropic/claude-opus-4-6` 或 `openai/gpt-5.4`。
 
 #### Pipeline 配置
 
@@ -488,7 +490,7 @@ PyMuPDF 对扫描版 PDF 效果有限。建议：
 尝试：
 - 增加迭代轮数：`--max-rounds 5`
 - 调大 token 预算（编辑 `config.yaml` 中的 `token_budget`）
-- 使用更强的模型做提取：`--model-extract anthropic/claude-opus-4-20250115`
+- 使用更强的模型做提取：`--model-extract anthropic/claude-opus-4-6`
 
 ### Q: Token 消耗太高
 
