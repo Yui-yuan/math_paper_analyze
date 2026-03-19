@@ -70,6 +70,7 @@ export MOONSHOT_API_KEY="sk-xxxxx"     # Moonshot (Kimi)
 export MINIMAX_API_KEY="xxxxx"         # MiniMax
 export ANTHROPIC_API_KEY="sk-ant-xxx"  # Anthropic (Claude)
 export OPENAI_API_KEY="sk-xxxxx"       # OpenAI
+export GEMINI_API_KEY="xxxxx"          # Google Gemini
 ```
 
 你也可以在系统环境变量中永久设置，避免每次都输入。只需要设置你实际使用的服务商的 key。
@@ -262,6 +263,9 @@ models:
 | Claude Haiku 4.5 | `anthropic/claude-haiku-4-5-20251001` | 快速 | $0.8/M tokens |
 | GPT-4o | `openai/gpt-4o` | OpenAI 主力 | $2.5/M tokens |
 | GPT-4o mini | `openai/gpt-4o-mini` | 便宜 | $0.15/M tokens |
+| Gemini 2.5 Pro | `gemini/gemini-2.5-pro` | Google 最强，100万上下文 | $1.25/M tokens |
+| Gemini 2.5 Flash | `gemini/gemini-2.5-flash` | 快速便宜 | $0.15/M tokens |
+| Gemini 2.0 Flash | `gemini/gemini-2.0-flash` | 最便宜 | $0.10/M tokens |
 
 **省钱建议**：默认配置使用 DeepSeek，全流程跑完一篇论文大约 ¥0.1-0.5。如果追求最高质量，批判阶段换成 `anthropic/claude-opus-4-20250115` 或 `openai/o3`。
 

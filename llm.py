@@ -179,6 +179,10 @@ def estimate_cost(model: str, input_tokens: int, output_tokens: int) -> float:
         "moonshot/moonshot-v1-128k": (8.33, 8.33),    # ¥60 per M tokens
         # MiniMax (¥ -> $)
         "minimax/MiniMax-Text-01": (0.14, 0.14),      # ¥1 per M tokens
+        # Gemini
+        "gemini/gemini-2.5-pro": (1.25, 10.0),
+        "gemini/gemini-2.5-flash": (0.15, 0.6),
+        "gemini/gemini-2.0-flash": (0.10, 0.40),
     }
 
     rate = pricing.get(model, (1.0, 2.0))  # 默认便宜价格

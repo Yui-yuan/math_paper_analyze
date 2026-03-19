@@ -26,6 +26,10 @@ providers:
     base_url: "https://api.minimax.chat/v1"
     api_key_env: MINIMAX_API_KEY
 
+  gemini:
+    base_url: "https://generativelanguage.googleapis.com/v1beta/openai/"
+    api_key_env: GEMINI_API_KEY
+
   # 你可以在这里添加任何 OpenAI 兼容的服务商:
   # my_provider:
   #   base_url: "https://your-api.com/v1"
