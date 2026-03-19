@@ -1,0 +1,7 @@
+anthropic>=0.40.0
+openai>=1.50.0
+PyMuPDF>=1.24.0
+rich>=13.0.0
+pyyaml>=6.0
+tiktoken>=0.7.0
+Jinja2>=3.1.0

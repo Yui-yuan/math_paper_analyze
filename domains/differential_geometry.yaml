@@ -1,0 +1,33 @@
+name: differential_geometry
+display_name: 微分几何
+
+context_hints:
+  - 注意流形的类别（Riemannian, Kähler, symplectic, contact）
+  - 注意紧致性和完备性假设，很多整体定理依赖于此
+  - 曲率条件（正曲率、非负 Ricci、截面曲率有界）的具体形式至关重要
+  - 联络的选取（Levi-Civita, Chern, 一般联络）影响几何量的计算
+
+common_techniques:
+  - name: Bochner 技巧
+    description: 对几何量应用 Laplacian，利用曲率条件得到消没或估计
+  - name: 比较几何 (Comparison Geometry)
+    description: Toponogov, Bishop-Gromov, Laplacian comparison，与模型空间比较
+  - name: 几何流 (Geometric Flows)
+    description: Ricci flow, mean curvature flow, 通过演化方程改善几何
+  - name: 指标定理 (Index Theorems)
+    description: Atiyah-Singer 指标定理，联系分析和拓扑
+  - name: 调和分析方法
+    description: Hodge 理论、热核估计
+
+critical_assumptions:
+  - "完备性和紧致性不等价，注意作者使用的是哪个"
+  - "截面曲率和 Ricci 曲率的控制强度不同"
+  - "维数在很多估计中有本质影响（如 Sobolev 常数）"
+
+standard_notation:
+  "\\mathrm{Ric}": Ricci 曲率张量
+  "R_{ijkl}": 黎曼曲率张量
+  "\\nabla": Levi-Civita 联络
+  "\\mathrm{sec}(\\sigma)": 截面曲率
+  "\\mathrm{Vol}(B_r)": 测地球的体积
+  "\\Delta_g": Laplace-Beltrami 算子

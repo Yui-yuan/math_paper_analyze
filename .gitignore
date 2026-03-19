@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+
+# 缓存和输出（每台机器自己生成，但保留目录结构）
+cache/*
+!cache/.gitkeep
+output/*
+!output/.gitkeep
+
+# 论文文件（可能有版权，不上传）
+papers/*.pdf
+papers/*.tex
+papers/*.latex
+
+# 环境变量 / 密钥
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

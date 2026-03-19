@@ -1,0 +1,37 @@
+name: pde
+display_name: 偏微分方程
+
+context_hints:
+  - 注意方程的类型（椭圆、抛物、双曲）决定了可用的工具和方法
+  - 注意边界条件的类型（Dirichlet, Neumann, Robin, 混合）
+  - 函数空间的选取（Sobolev, Hölder, Besov）直接影响正则性结论
+  - 注意维数限制，很多估计在高维时退化或失效
+  - 弱解、强解、经典解之间的区别至关重要
+
+common_techniques:
+  - name: 能量估计 (Energy Estimates)
+    description: 对方程乘以适当的测试函数并积分，得到先验估计
+  - name: 极大值原理 (Maximum Principle)
+    description: 弱极大值原理、强极大值原理 (Hopf)，用于椭圆和抛物方程
+  - name: Sobolev 嵌入 (Sobolev Embedding)
+    description: 将 Sobolev 正则性转化为 Hölder 或 L^p 正则性
+  - name: Schauder 估计
+    description: 椭圆方程解的 Hölder 正则性估计
+  - name: De Giorgi-Nash-Moser 方法
+    description: 散度型椭圆方程弱解的 Hölder 连续性
+  - name: 紧性方法 (Compactness)
+    description: 利用 Arzelà-Ascoli, Rellich-Kondrachov 等紧嵌入定理取极限
+
+critical_assumptions:
+  - "椭圆性条件的具体形式（一致椭圆 vs 退化椭圆）"
+  - "系数的正则性假设（连续、Hölder、L^∞）直接影响解的正则性"
+  - "区域的正则性（光滑边界 vs Lipschitz 边界）影响边界正则性"
+  - "维数 n 在 Sobolev 嵌入中起关键作用，n=2 常有对数修正"
+
+standard_notation:
+  "H^s(\\Omega)": Sobolev 空间
+  "W^{k,p}(\\Omega)": Sobolev 空间 (一般 p)
+  "C^{k,\\alpha}(\\Omega)": Hölder 空间
+  "\\Delta": Laplace 算子
+  "\\nabla": 梯度算子
+  "\\partial_t": 时间偏导

@@ -1,0 +1,32 @@
+name: combinatorics
+display_name: 组合数学
+
+context_hints:
+  - 注意渐近记号的精确含义（O, o, Θ, ~），以及隐含常数的依赖关系
+  - 概率方法和确定性构造往往给出不同强度的结论
+  - 极值组合中注意参数的范围和边界情况
+  - 图论中注意有向/无向、简单/多重图的区别
+
+common_techniques:
+  - name: 概率方法 (Probabilistic Method)
+    description: 通过随机构造证明存在性，Lovász Local Lemma 等
+  - name: 生成函数 (Generating Functions)
+    description: 普通/指数生成函数，用于计数和渐近分析
+  - name: 容斥原理 (Inclusion-Exclusion)
+    description: 交替求和计算集合的大小
+  - name: 正则引理 (Regularity Lemma)
+    description: Szemerédi 正则引理，将大图分解为伪随机部分
+  - name: 多项式方法 (Polynomial Method)
+    description: 组合零点定理、Chevalley-Warning 等
+
+critical_assumptions:
+  - "渐近结论的适用范围：n 需要多大才能使结论有效？"
+  - "常数的显式性：隐含常数是否可计算？是否依赖其他参数？"
+  - "概率方法给出的存在性证明通常不构造具体对象"
+
+standard_notation:
+  "\\binom{n}{k}": 二项式系数
+  "\\sim": 渐近等价
+  "o(1)": 趋于零的量
+  "\\chi(G)": 色数
+  "\\mathrm{ex}(n, H)": Turán 数

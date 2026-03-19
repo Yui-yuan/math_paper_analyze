@@ -1,0 +1,33 @@
+name: probability
+display_name: 概率论与随机分析
+
+context_hints:
+  - 注意概率空间和 σ-代数的具体设定
+  - 注意可积性条件（L^1, L^2, 指数可积等）
+  - 鞅论中的可料性 (predictability) 和适应性 (adaptedness) 区别重要
+  - 收敛模式的区别（几乎必然、依概率、L^p、依分布）
+
+common_techniques:
+  - name: 鞅方法 (Martingale Methods)
+    description: 停时定理、Doob 不等式、Burkholder-Davis-Gundy 不等式
+  - name: 耦合 (Coupling)
+    description: 构造联合分布来比较两个随机过程
+  - name: 大偏差 (Large Deviations)
+    description: Cramér 定理、Sanov 定理，精确估计稀有事件概率
+  - name: Itô 计算 (Itô Calculus)
+    description: Itô 公式、Girsanov 变换、随机积分
+  - name: 集中不等式 (Concentration Inequalities)
+    description: Hoeffding, Bernstein, Talagrand 集中不等式
+
+critical_assumptions:
+  - "独立性假设在很多结论中至关重要，弱相关的情况需要额外处理"
+  - "可积性条件的阶数（一阶矩 vs 二阶矩 vs 指数矩）影响结论强度"
+  - "注意离散时间和连续时间的转换是否合法"
+
+standard_notation:
+  "\\mathbb{E}[X]": 期望
+  "\\mathbb{P}(A)": 概率
+  "(\\Omega, \\mathcal{F}, \\mathbb{P})": 概率空间
+  "\\{\\mathcal{F}_t\\}": 滤子/filtration
+  "B_t": Brown 运动/Wiener 过程
+  "\\langle M \\rangle_t": 二次变差

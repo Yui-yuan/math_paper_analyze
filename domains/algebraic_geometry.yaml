@@ -1,0 +1,43 @@
+name: algebraic_geometry
+display_name: 代数几何
+
+context_hints:
+  - 注意区分 scheme 和 variety，作者可能在两者间切换而不声明
+  - 注意基域/基方案的假设，很多结论默认在代数闭域上成立
+  - 注意特征限制（char 0 vs char p），很多经典结果在正特征下失效
+  - coherent sheaf 的讨论中注意是否默认了 Noetherian 条件
+  - 态射的性质（proper, flat, smooth, étale）影响很多定理的适用性
+
+common_techniques:
+  - name: 消没定理 (Vanishing Theorems)
+    description: Kodaira, Kawamata-Viehweg, Serre 消没等，用于杀死上同调群
+  - name: 基变换 (Base Change)
+    description: flat/proper base change 传递上同调信息
+  - name: 形变理论 (Deformation Theory)
+    description: 通过无穷小形变研究模空间的局部结构
+  - name: 谱序列 (Spectral Sequences)
+    description: Leray, Grothendieck 谱序列，计算复合函子的导出函子
+  - name: 下降 (Descent)
+    description: faithfully flat descent, étale descent，粘合局部数据
+  - name: GIT 商 (GIT Quotients)
+    description: 通过几何不变量理论构造模空间
+  - name: 交换图追踪 (Diagram Chasing)
+    description: 在正合序列和交换图中追踪元素
+
+critical_assumptions:
+  - "proper morphism 和 projective morphism 不等价，注意作者用的是哪个"
+  - "flat 不蕴含 smooth，注意纤维的奇异性"
+  - "Chow 群和 K-theory 的关系依赖于正则性假设"
+  - "上同调的有限性通常需要 coherent + proper 的条件"
+  - "Serre 对偶需要 Cohen-Macaulay 条件，Grothendieck 对偶更一般"
+
+standard_notation:
+  "\\mathcal{O}_X": 结构层
+  "\\omega_X": 典范层/对偶层
+  "H^i(X, \\mathcal{F})": 层上同调
+  "\\mathrm{Pic}(X)": Picard 群
+  "\\mathrm{Ch}(\\mathcal{F})": Chern 特征
+  "\\Omega^1_{X/S}": 相对微分层
+  "K_X": 典范除子
+  "\\mathrm{Spec}(R)": 仿射概形
+  "\\mathrm{Proj}(S)": 射影概形

@@ -1,0 +1,97 @@
+# Math Paper Reader 默认配置
+
+# ============================================================
+# Provider 配置 — 所有支持的 API 服务商
+# 所有服务商都通过 OpenAI 兼容接口调用
+# ============================================================
+providers:
+  anthropic:
+    base_url: "https://api.anthropic.com/v1"
+    api_key_env: ANTHROPIC_API_KEY
+    compatible_mode: false  # Anthropic 有自己的 SDK，不走 OpenAI 兼容
+
+  openai:
+    base_url: "https://api.openai.com/v1"
+    api_key_env: OPENAI_API_KEY
+
+  deepseek:
+    base_url: "https://api.deepseek.com/v1"
+    api_key_env: DEEPSEEK_API_KEY
+
+  moonshot:
+    base_url: "https://api.moonshot.cn/v1"
+    api_key_env: MOONSHOT_API_KEY
+
+  minimax:
+    base_url: "https://api.minimax.chat/v1"
+    api_key_env: MINIMAX_API_KEY
+
+  # 你可以在这里添加任何 OpenAI 兼容的服务商:
+  # my_provider:
+  #   base_url: "https://your-api.com/v1"
+  #   api_key_env: MY_API_KEY
+
+# ============================================================
+# 模型配置 — 每个阶段独立选择 provider/model
+# 格式: "provider/model_name"
+# ============================================================
+models:
+  preprocess: "deepseek/deepseek-chat"              # 便宜，适合预处理
+  extract: "deepseek/deepseek-chat"                 # 提取
+  critique: "deepseek/deepseek-reasoner"            # 推理强，适合批判
+  synthesize: "deepseek/deepseek-chat"              # 修正
+  interactive: "deepseek/deepseek-chat"             # 研讨模式
+
+  # 如果你有 Anthropic/OpenAI key，可以换成:
+  # preprocess: "anthropic/claude-haiku-4-5-20251001"
+  # extract: "anthropic/claude-sonnet-4-20250514"
+  # critique: "anthropic/claude-opus-4-20250115"
+  # synthesize: "anthropic/claude-sonnet-4-20250514"
+  # interactive: "anthropic/claude-sonnet-4-20250514"
+
+# 数学领域 (留空则不启用领域增强)
+# 可选: algebraic_geometry, number_theory, pde, topology, probability,
+#       combinatorics, representation_theory, differential_geometry
+domain: null
+
+# Pipeline 配置
+pipeline:
+  max_rounds: 3              # 最大自迭代轮数
+  convergence_threshold: 2   # 批判意见 <= 此数则停止迭代
+
+# Token 优化
+optimization:
+  two_pass_reading: true       # 两遍读法（粗读+精读）
+  preprocess_compression: true # 预处理压缩
+  cache_intermediates: true    # 缓存中间结果
+
+# Token 预算 (单位: token 数)
+token_budget:
+  preprocess:  { input_max: 8000 }
+  extract:     { input_max: 6000, output_max: 2000 }
+  critique:    { input_max: 3000, output_max: 1000 }
+  synthesize:  { input_max: 4000, output_max: 2500 }
+  interactive: { input_max: 3000, output_max: 500 }
+
+# 输出配置
+output:
+  format: [markdown]          # markdown, latex
+  language: zh                # zh / en
+  layers: [1, 2]              # 默认输出 Layer 1 + Layer 2
+  layer3_targets: auto        # auto / manual / all
+  max_layer3_proofs: 2        # Layer 3 最多展开几个证明
+  auto_compile_pdf: false     # 是否自动编译 LaTeX 到 PDF
+  output_dir: "./output"      # 输出目录
+
+# 论文目录
+papers_dir: "./papers"
+
+# 缓存目录
+cache_dir: "./cache"
+
+# 研讨模式
+interactive:
+  enabled: true
+  context_window: 5           # 保留最近几轮 QA
+  history_compression: true   # 压缩更早的 QA 历史
+  auto_save: true             # 自动保存追问结果到笔记

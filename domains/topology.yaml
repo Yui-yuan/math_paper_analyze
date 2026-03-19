@@ -1,0 +1,33 @@
+name: topology
+display_name: 拓扑学
+
+context_hints:
+  - 注意拓扑空间的具体类别（流形、CW 复形、单纯复形）
+  - 上同调理论的选取（奇异、de Rham、层上同调、étale）影响结论
+  - 注意定向性、紧致性、连通性假设
+  - 同伦等价和同胚是本质不同的概念
+
+common_techniques:
+  - name: 谱序列 (Spectral Sequences)
+    description: Serre, Adams, Atiyah-Hirzebruch 谱序列，计算复杂上同调
+  - name: 特征类 (Characteristic Classes)
+    description: Chern 类、Stiefel-Whitney 类、Pontryagin 类，提取向量丛的拓扑信息
+  - name: 手术理论 (Surgery Theory)
+    description: 通过手术操作修改流形的拓扑类型
+  - name: Morse 理论
+    description: 通过 Morse 函数的临界点分析流形的拓扑
+  - name: 配边理论 (Cobordism)
+    description: 通过配边关系对流形分类
+
+critical_assumptions:
+  - "紧致性和有限维性假设在很多定理中不可省略"
+  - "上同调系数环的选取（Z, Q, Z/2Z）影响可计算性"
+  - "smooth 和 topological 范畴的结果可能本质不同（4维是关键分界）"
+
+standard_notation:
+  "H_n(X; R)": 同调群
+  "H^n(X; R)": 上同调群
+  "\\pi_n(X)": 同伦群
+  "[X, Y]": 同伦类集合
+  "\\chi(X)": 欧拉示性数
+  "\\Omega^n": 配边群

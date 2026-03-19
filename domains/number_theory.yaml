@@ -1,0 +1,38 @@
+name: number_theory
+display_name: 数论
+
+context_hints:
+  - 注意数域的选取（Q, 数域扩张, 函数域），很多结论依赖于具体的基域
+  - 注意素数 p 的限制条件（good reduction, bad reduction, ramification）
+  - L-函数和 zeta 函数的解析延拓和函数方程是核心工具
+  - 模形式的权 (weight) 和级 (level) 是关键参数，不要遗漏
+  - Galois 表示的性质（不可约性、半单性）影响很多论证
+
+common_techniques:
+  - name: 模形式理论 (Modular Forms)
+    description: Hecke 算子、Fourier 展开、newforms 理论
+  - name: 筛法 (Sieve Methods)
+    description: Selberg 筛、大筛法、GPY 筛，用于估计素数分布
+  - name: 圆法 (Circle Method)
+    description: Hardy-Littlewood 圆法，将计数问题转化为指数和估计
+  - name: p-adic 方法
+    description: p-adic Hodge 理论、p-adic L-函数、Iwasawa 理论
+  - name: 自守形式 (Automorphic Forms)
+    description: 表示论方法研究 L-函数的解析性质
+  - name: 下降法 (Descent)
+    description: 研究椭圆曲线 Mordell-Weil 群的有限生成性
+
+critical_assumptions:
+  - "GRH (广义 Riemann 假设) 是否被假设？很多结论在 GRH 下才成立"
+  - "Selmer 群和 Tate-Shafarevich 群的有限性常常是未证明的假设"
+  - "特征 p 和特征 0 的情况往往有本质区别"
+  - "注意 conductor 和 discriminant 的具体值对结论的影响"
+
+standard_notation:
+  "\\mathbb{Z}_p": p-adic 整数环
+  "\\mathbb{Q}_p": p-adic 数域
+  "\\mathrm{Gal}(\\bar{K}/K)": 绝对 Galois 群
+  "L(s, f)": L-函数
+  "\\mathrm{Sel}_p(E/K)": p-Selmer 群
+  "\\mathrm{Ш}(E/K)": Tate-Shafarevich 群
+  "\\rho: G_K \\to \\mathrm{GL}_n": Galois 表示
