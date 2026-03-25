@@ -55,7 +55,7 @@ def _call_openai_compatible(
     if api_key:
         kwargs["api_key"] = api_key
 
-    client = OpenAI(**kwargs)
+    client = OpenAI(timeout=180.0, **kwargs)
 
     full_messages = [{"role": "system", "content": system_prompt}] + messages
 

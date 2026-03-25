@@ -1,6 +1,8 @@
 # Math Paper Reader
 
-AI 辅助数学论文阅读工具。通过三阶段 Pipeline（提取 → 批判 → 修正）自动生成高质量的论文研读笔记，并支持交互式追问。
+> ⚠️ **开发中** — 本项目仍在完善阶段，许多功能有待进一步改进和优化。欢迎反馈 Bug 和建议！
+
+AI 辅助数学论文阅读工具。通过三阶段 Pipeline（提取 → 批判 → 修正）自动生成高质量的论文研读笔记，支持可选的第四阶段（研究突破问题生成），并支持交互式追问。
 
 ---
 
@@ -10,6 +12,7 @@ AI 辅助数学论文阅读工具。通过三阶段 Pipeline（提取 → 批判
 - [论文管理](#论文管理)
 - [快速开始](#快速开始)
 - [完整用法](#完整用法)
+- [Section 与页码过滤](#section-与页码过滤)
 - [配置文件](#配置文件)
 - [数学领域支持](#数学领域支持)
 - [输出格式说明](#输出格式说明)
@@ -127,6 +130,13 @@ python main.py your_paper.pdf --domain algebraic_geometry
 
 指定领域后，模型会获得该领域的专业提示（常见技巧、易遗漏假设、标准记号），生成质量更高。
 
+**可选高级功能：**
+- **按 Section 过滤**：`--sections "keyword"`，只读论文的某些章节
+- **按页码过滤**：`--pages 5-12`，只读 PDF 的指定页面
+- **研究问题生成**：`--research-questions`，在笔记末尾自动生成 5 个研究突破问题
+
+更多细节见 [Section 与页码过滤](#section-与页码过滤) 和 [输出格式说明 → Layer 4](#layer-4研究突破问题可选需启用-research-questions)。
+
 ---
 
 ## 完整用法
@@ -146,6 +156,9 @@ python main.py [论文路径] [选项]
 | `--format` | `-f` | 输出格式：markdown / latex / both | `-f both` |
 | `--language` | `-l` | 输出语言：zh（中文）/ en（英文） | `-l en` |
 | `--max-rounds` | `-r` | 最大自迭代轮数 | `-r 5` |
+| `--sections` | `-s` | 只分析指定 Section（逗号分隔的标题关键词） | `-s "Proof,Main Theorem"` |
+| `--pages` | `-p` | 只分析指定页码范围（仅对 PDF 有效） | `-p 5-12` 或 `-p 7` |
+| `--research-questions` | | 生成研究突破问题（Stage 4），在笔记末尾附加 5 个问题 | |
 | `--no-interactive` | | 跳过研讨模式，直接输出笔记后退出 | |
 | `--model-extract` | | Stage 1（提取）使用的模型 | `--model-extract openai/gpt-4o` |
 | `--model-critique` | | Stage 2（批判）使用的模型 | `--model-critique anthropic/claude-opus-4-6` |
@@ -177,6 +190,18 @@ python main.py paper.pdf --model-extract openai/gpt-5.4 --model-critique anthrop
 # 增加迭代轮数（更精细，但更费 token）
 python main.py paper.pdf -r 5
 
+# 只分析某些 Section（按标题关键词）
+python main.py paper.pdf --sections "Main Theorem,Proof"
+
+# 只分析某个页码范围（仅对 PDF）
+python main.py paper.pdf --pages 5-12
+
+# 同时用 Section 和页码过滤（会请你确认）
+python main.py paper.pdf --sections "Proof" --pages 1-20
+
+# 启用研究突破问题生成（Stage 4，会在笔记末尾添加 5 个研究问题）
+python main.py paper.pdf --research-questions
+
 # 只要笔记，不进入研讨模式
 python main.py paper.pdf --no-interactive
 
@@ -195,6 +220,57 @@ python main.py --list-domains
 | LaTeX | `.tex`, `.latex` | 解析 `\section`, `\begin{theorem}` 等结构 |
 | Markdown | `.md`, `.markdown` | 按标题层级解析 |
 | 纯文本 | `.txt` 或其他 | 尝试按 Section 编号解析 |
+
+---
+
+## Section 与页码过滤
+
+### 按 Section 标题过滤
+
+如果论文很长，只想分析某些特定的章节或部分，可以用 `--sections` 参数指定：
+
+```bash
+python main.py paper.pdf --sections "Proof,Main Theorem"
+```
+
+匹配规则：
+- 多个关键词用逗号分隔
+- **不区分大小写**（`proof` 和 `Proof` 效果相同）
+- **模糊匹配**（只要 Section 标题中**包含**关键词即可匹配，不需完全相同）
+- 所有匹配的 Section 都会被选中
+
+### 按页码范围过滤
+
+仅对 PDF 有效。用 `--pages` 参数指定页码范围：
+
+```bash
+# 只分析第 5-12 页
+python main.py paper.pdf --pages 5-12
+
+# 或指定单页
+python main.py paper.pdf --pages 7
+```
+
+### 同时用两种过滤条件
+
+当同时指定 `--sections` 和 `--pages` 时，两个条件都会应用（**取交集**）：
+
+```bash
+# 只分析"第 5-12 页"且"标题包含 Proof 的" Section
+python main.py paper.pdf --sections "Proof" --pages 5-12
+```
+
+### 确认对话
+
+无论用哪种过滤方式，程序都会展示一个表格，列出：
+- 匹配到的所有 Section ID、标题、页码、Token 估计
+- 合计 Token 数
+
+你可以：
+- **Y** (或 **enter**）：确认，开始分析
+- **N**（或 **no** / **否**）：取消，不进行分析
+
+这样可以避免误操作，特别是在大论文上。
 
 ---
 
@@ -277,6 +353,12 @@ models:
 pipeline:
   max_rounds: 3              # 最大迭代轮数（越多越精细，但越费 token）
   convergence_threshold: 2   # 当批判意见 ≤ 2 条时停止迭代
+
+# Stage 4（可选）：研究突破问题生成
+research_questions:
+  enabled: false             # 默认关闭，用 --research-questions 或这里设为 true 启用
+  model: "deepseek/deepseek-reasoner"  # 推荐用推理强的模型
+  num_questions: 5           # 生成问题数量
 ```
 
 #### Token 预算
@@ -363,7 +445,7 @@ standard_notation:
 
 ## 输出格式说明
 
-生成的笔记按三层组织：
+生成的笔记按四层组织（后两层可选）：
 
 ### Layer 1：一页纸总览（300-500 词）
 
@@ -384,6 +466,26 @@ standard_notation:
 - 对最核心证明的详细复现
 - 补充的细节用 `> [!added]` 标出
 - 无法复现的步骤用 `> [!gap]` 标出
+
+### Layer 4：研究突破问题（可选，需启用 `--research-questions`）
+
+用一个强大的模型（如 Claude Opus 或 GPT-4o）基于完整笔记提出 5 个研究突破问题。每个问题包括：
+- 问题描述：清楚地阐述这是什么问题及其重要性
+- 与论文的联系：指出如何从本文的技术或结果推广/变化这个问题
+- 潜在价值：为什么这个问题值得研究
+
+启用方式：
+```bash
+python main.py paper.pdf --research-questions
+```
+
+或在 `config.yaml` 中设置：
+```yaml
+research_questions:
+  enabled: true
+  num_questions: 5           # 可自定义问题数量
+  model: "anthropic/claude-opus-4-6"  # 推荐用强模型
+```
 
 ### 附录
 
@@ -411,7 +513,8 @@ Pipeline 完成后，程序自动进入研讨模式。你可以对笔记内容�
 |------|------|------|
 | `expand <编号>` | 展开某定理/引理的证明细节 | `expand Lemma 3.2` |
 | `why <编号>` | 解释为什么需要这个结果 | `why Proposition 2.1` |
-| `gap <位置>` | 要求补全某处逻辑跳跃 | `gap Theorem 4.1 step 3` |
+| `gap <位置>` | 要求补全某处逻辑跳跃 | `gap Theorem 4.1 step 3` |-v
+
 | `compare <A> and <B>` | 对比两个结果的异同 | `compare Prop 2.1 and Prop 2.3` |
 | `what-if <条件变化>` | 假设性提问 | `what-if 去掉条件 p>2` |
 | `example <编号>` | 给出具体例子帮助理解 | `example Theorem 1.1` |
@@ -527,3 +630,40 @@ models:
 - 用 `expand` 指令展开特定证明
 - 调大 `token_budget.interactive.output_max`（默认 500，可以改到 1000-2000）
 - 用更强的模型：在 `config.yaml` 中设置 `models.interactive`
+
+### Q: 如何用 `--sections` 或 `--pages` 过滤？
+
+过滤参数会在启动分析前展示一个确认表格，列出所有匹配的 Section：
+
+```bash
+# 按 Section 标题关键词过滤（模糊匹配，不区分大小写）
+python main.py paper.pdf --sections "Proof,Theorem"
+
+# 按 PDF 页码过滤
+python main.py paper.pdf --pages 5-12
+
+# 同时用两种条件（取交集）
+python main.py paper.pdf --sections "Main" --pages 1-20
+```
+
+确认对话出现后，按 **Y** 继续或 **N** 取消。
+
+### Q: 研究问题质量不好
+
+研究问题生成使用的是 `models.questions` 中配置的模型。默认是 `deepseek/deepseek-reasoner`，但如果你需要更高质量的问题，建议改用：
+
+```yaml
+research_questions:
+  model: "anthropic/claude-opus-4-6"  # 或 openai/gpt-5.4
+```
+
+也可以用命令行覆盖（虽然目前没有专门的 CLI 参数，可以直接编辑 `config.yaml` 的 `research_questions.model`）。
+
+### Q: `--sections` 没有匹配到任何 Section
+
+检查：
+1. 关键词是否正确（用 `python main.py --list-papers` 再看一遍原文标题）
+2. 是否用了完全相反的大小写（虽然程序是大小写不敏感的，但值得确认）
+3. 如果原文 Section 标题很特殊，试试换个更简短的关键词
+
+可以用 `python main.py paper.pdf -s ""` （空值）来看所有 Section 及其页码，帮助调试。
