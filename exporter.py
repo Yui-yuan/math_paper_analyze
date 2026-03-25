@@ -132,6 +132,12 @@ def _build_markdown(
         # 没有成功拆分，输出完整笔记
         parts.append(result.full_notes)
 
+    # Stage 4：研究突破问题（可选）
+    if result.research_questions:
+        parts.append("\n---\n")
+        parts.append("## 潜在研究突破方向\n")
+        parts.append(result.research_questions)
+
     return "\n".join(parts)
 
 

@@ -26,6 +26,7 @@ class ModelConfig:
     critique: str = "deepseek/deepseek-reasoner"
     synthesize: str = "deepseek/deepseek-chat"
     interactive: str = "deepseek/deepseek-chat"
+    questions: str = "deepseek/deepseek-chat"
 
 
 @dataclass
@@ -54,6 +55,7 @@ class TokenBudgetConfig:
     critique: TokenBudgetStage = field(default_factory=lambda: TokenBudgetStage(input_max=3000, output_max=1000))
     synthesize: TokenBudgetStage = field(default_factory=lambda: TokenBudgetStage(input_max=4000, output_max=2500))
     interactive: TokenBudgetStage = field(default_factory=lambda: TokenBudgetStage(input_max=3000, output_max=500))
+    questions: TokenBudgetStage = field(default_factory=lambda: TokenBudgetStage(input_max=30000, output_max=3000))
 
 
 @dataclass
@@ -87,6 +89,7 @@ class AppConfig:
     interactive: InteractiveConfig = field(default_factory=InteractiveConfig)
     papers_dir: str = "./papers"
     cache_dir: str = "./cache"
+    research_questions_enabled: bool = False
 
 
 def _dict_to_dataclass(cls, data: dict):
@@ -167,6 +170,7 @@ def load_config(config_path: Optional[str] = None, overrides: Optional[dict] = N
             critique=TokenBudgetStage(**tb.get('critique', {})) if 'critique' in tb else TokenBudgetStage(input_max=3000, output_max=1000),
             synthesize=TokenBudgetStage(**tb.get('synthesize', {})) if 'synthesize' in tb else TokenBudgetStage(input_max=4000, output_max=2500),
             interactive=TokenBudgetStage(**tb.get('interactive', {})) if 'interactive' in tb else TokenBudgetStage(input_max=3000, output_max=500),
+            questions=TokenBudgetStage(**tb.get('questions', {})) if 'questions' in tb else TokenBudgetStage(input_max=30000, output_max=3000),
         )
 
     if 'output' in raw and raw['output']:
@@ -179,6 +183,13 @@ def load_config(config_path: Optional[str] = None, overrides: Optional[dict] = N
         config.papers_dir = raw['papers_dir']
     if 'cache_dir' in raw:
         config.cache_dir = raw['cache_dir']
+
+    if 'research_questions' in raw and raw['research_questions']:
+        config.research_questions_enabled = raw['research_questions'].get('enabled', False)
+
+    # 支持命令行直接覆盖
+    if 'research_questions_enabled' in raw:
+        config.research_questions_enabled = raw['research_questions_enabled']
 
     return config
 

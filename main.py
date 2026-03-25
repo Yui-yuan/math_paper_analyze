@@ -6,6 +6,7 @@ from pathlib import Path
 
 from rich.console import Console
 from rich.panel import Panel
+from rich.table import Table
 
 from config import load_config, list_domains, AppConfig
 from reader import read_paper
@@ -86,6 +87,22 @@ def main():
         "--no-interactive",
         action="store_true",
         help="跳过研讨模式",
+    )
+
+    parser.add_argument(
+        "--research-questions",
+        action="store_true",
+        help="在笔记末尾生成研究突破问题（Stage 4）",
+    )
+
+    parser.add_argument(
+        "--sections", "-s",
+        help="只分析指定 Section（逗号分隔的标题关键词，如 'Proof,Main Theorem'）",
+    )
+
+    parser.add_argument(
+        "--pages", "-p",
+        help="只分析指定页码范围（如 '5-12' 或 '7'），仅对 PDF 有效",
     )
 
     parser.add_argument(
@@ -170,6 +187,8 @@ def main():
         overrides['pipeline.max_rounds'] = args.max_rounds
     if args.no_interactive:
         overrides['interactive.enabled'] = False
+    if args.research_questions:
+        overrides['research_questions_enabled'] = True
     if args.model_extract:
         overrides['models.extract'] = args.model_extract
     if args.model_critique:
@@ -197,6 +216,13 @@ def main():
     console.print(f"  Section 数量: {len(paper.sections)}")
     console.print(f"  总 token 估计: ~{paper.total_tokens}")
 
+    # Step 1.5: Section / 页码过滤 + 确认
+    if args.sections or args.pages:
+        paper = _filter_and_confirm(paper, args.sections, args.pages)
+        if paper is None:
+            console.print("[yellow]已取消。[/yellow]")
+            return
+
     # Step 2: 预处理
     if config.optimization.preprocess_compression:
         console.print("\n[bold]Step 2:[/bold] 预处理压缩...")
@@ -223,6 +249,78 @@ def main():
         run_interactive(paper, result, config)
 
     console.print("\n[bold green]完成！[/bold green]")
+
+
+def _filter_and_confirm(paper, sections_arg, pages_arg):
+    """
+    按 section 关键词和/或页码范围过滤，展示结果并请用户确认。
+    返回过滤后的 paper，用户取消则返回 None。
+    """
+    filtered = list(paper.sections)
+
+    # ---- 按页码过滤 ----
+    page_start_filter = page_end_filter = None
+    if pages_arg:
+        parts = pages_arg.strip().split('-')
+        try:
+            page_start_filter = int(parts[0])
+            page_end_filter = int(parts[1]) if len(parts) > 1 else page_start_filter
+        except ValueError:
+            console.print(f"[red]页码格式错误: {pages_arg}，应为 '5-12' 或 '7'[/red]")
+            return None
+
+        filtered = [
+            s for s in filtered
+            if s.page_start is not None and s.page_end is not None
+            and s.page_start <= page_end_filter
+            and s.page_end >= page_start_filter
+        ]
+
+    # ---- 按 Section 关键词过滤 ----
+    if sections_arg:
+        keywords = [k.strip().lower() for k in sections_arg.split(',') if k.strip()]
+        filtered = [
+            s for s in filtered
+            if any(kw in s.title.lower() for kw in keywords)
+        ]
+
+    # ---- 展示结果表格 ----
+    console.print()
+    if not filtered:
+        console.print("[red]没有找到符合条件的 Section，请检查过滤参数。[/red]")
+        console.print(f"  共 {len(paper.sections)} 个 Section：")
+        for s in paper.sections:
+            page_info = f"  页 {s.page_start}-{s.page_end}" if s.page_start else ""
+            console.print(f"    [{s.id}] {s.title}{page_info}")
+        return None
+
+    table = Table(title=f"将分析以下 {len(filtered)} 个 Section", show_lines=True)
+    table.add_column("ID", style="cyan", width=10)
+    table.add_column("标题", style="bold")
+    table.add_column("页码", style="green", width=10)
+    table.add_column("Token 估计", style="yellow", width=12)
+
+    total_tokens = 0
+    for s in filtered:
+        page_info = f"{s.page_start}–{s.page_end}" if s.page_start else "—"
+        table.add_row(s.id, s.title, page_info, f"~{s.token_count}")
+        total_tokens += s.token_count
+
+    console.print(table)
+    console.print(f"合计 ~{total_tokens} tokens\n")
+
+    # ---- 用户确认 ----
+    try:
+        answer = input("是否开始分析？[Y/n] ").strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        return None
+
+    if answer in ('n', 'no', '否'):
+        return None
+
+    paper.sections = filtered
+    paper.total_tokens = total_tokens
+    return paper
 
 
 if __name__ == "__main__":

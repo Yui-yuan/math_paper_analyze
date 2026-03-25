@@ -15,6 +15,7 @@ from prompts import (
     EXTRACT_SYSTEM, EXTRACT_USER_FIRST_PASS, EXTRACT_USER_SECOND_PASS,
     CRITIQUE_SYSTEM, CRITIQUE_USER_FULL, CRITIQUE_USER_INCREMENTAL,
     SYNTHESIZE_SYSTEM, SYNTHESIZE_USER,
+    QUESTIONS_SYSTEM, QUESTIONS_USER,
     build_domain_hints, build_domain_assumptions, format_prompt,
 )
 
@@ -35,6 +36,7 @@ class PipelineResult:
     rounds_completed: int = 0
     total_input_tokens: int = 0
     total_output_tokens: int = 0
+    research_questions: str = ""   # Stage 4 生成的研究突破问题
 
 
 def run_pipeline(paper: PaperDocument, config: AppConfig) -> PipelineResult:
@@ -237,6 +239,14 @@ def run_pipeline(paper: PaperDocument, config: AppConfig) -> PipelineResult:
     # 尝试拆分 layers
     result.layer1, result.layer2, result.layer3, result.appendix = _split_layers(current_summary)
 
+    # ---- Stage 4: 研究突破点提问（可选）----
+    if config.research_questions_enabled:
+        console.print("\n[bold magenta][Stage 4][/bold magenta] 生成研究突破问题...")
+        result.research_questions = _generate_research_questions(result.full_notes, config)
+        result.total_input_tokens += estimate_tokens(result.full_notes)
+        result.total_output_tokens += estimate_tokens(result.research_questions)
+        console.print("  研究问题生成完毕")
+
     total_cost = estimate_cost(
         config.models.extract,
         result.total_input_tokens,
@@ -369,6 +379,37 @@ def _split_layers(full_notes: str) -> tuple:
         layer1 = full_notes
 
     return layer1, layer2, layer3, appendix
+
+
+def _generate_research_questions(full_notes: str, config: AppConfig) -> str:
+    """Stage 4：基于阅读笔记生成研究突破问题"""
+    count = 5
+    language = config.output.language
+
+    notes_input = truncate_to_budget(full_notes, config.token_budget.questions.input_max)
+
+    system_prompt = format_prompt(
+        QUESTIONS_SYSTEM,
+        count=str(count),
+        language=language,
+    )
+    user_prompt = format_prompt(
+        QUESTIONS_USER,
+        notes=notes_input,
+        count=str(count),
+    )
+
+    try:
+        output = call_llm(
+            model=config.models.questions,
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            config=config,
+            max_tokens=config.token_budget.questions.output_max,
+        )
+        return output.strip()
+    except Exception as e:
+        return f"[研究问题生成失败: {e}]"
 
 
 def _save_cache(cache_dir: Path, paper: PaperDocument, stage: str, content: str):
