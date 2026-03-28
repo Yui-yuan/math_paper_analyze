@@ -14,6 +14,7 @@ AI 辅助数学论文阅读工具。通过三阶段 Pipeline（提取 → 批判
 - [完整用法](#完整用法)
 - [Section 与页码过滤](#section-与页码过滤)
 - [配置文件](#配置文件)
+- [自定义 Prompt](#自定义-prompt)
 - [数学领域支持](#数学领域支持)
 - [输出格式说明](#输出格式说明)
 - [研讨模式](#研讨模式)
@@ -385,6 +386,56 @@ output:
   max_layer3_proofs: 2        # Layer 3 最多展开几个证明
   output_dir: "./output"      # 输出目录
 ```
+
+---
+
+## 自定义 Prompt
+
+所有 LLM 的指令模板都集中在 `prompts.py` 文件中，你可以直接修改来调整输出风格和内容侧重。
+
+### Prompt 结构
+
+| 变量名 | 阶段 | 作用 |
+|--------|------|------|
+| `EXTRACT_SYSTEM` | Stage 1 系统提示 | 控制提取风格：详细程度、是否要求公式、Layer 1/2/3 的内容要求 |
+| `EXTRACT_USER_FIRST_PASS` | Stage 1 粗读 | 第一遍只看骨架时的提问方式 |
+| `EXTRACT_USER_SECOND_PASS` | Stage 1 精读 | 精读核心 Section 时的输出要求 |
+| `CRITIQUE_SYSTEM` | Stage 2 系统提示 | 批判审查清单：改这里可以增减审查维度 |
+| `CRITIQUE_USER_FULL` | Stage 2 首轮批判 | 第一轮全面批判的提问 |
+| `CRITIQUE_USER_INCREMENTAL` | Stage 2 增量批判 | 后续轮次只审查修改部分 |
+| `SYNTHESIZE_SYSTEM` | Stage 3 系统提示 | 修正时的写作原则 |
+| `SYNTHESIZE_USER` | Stage 3 修正 | 修正时的具体要求 |
+| `QUESTIONS_SYSTEM` | Stage 4 系统提示 | 研究问题的生成原则 |
+| `INTERACTIVE_SYSTEM` | 研讨模式 | 追问时的回答风格 |
+
+### 常见调整场景
+
+**想要更详细的证明（推荐）：**
+
+修改 `EXTRACT_SYSTEM` 中 Layer 3 部分，例如增加对特定类型构造的要求：
+
+```python
+# 在 EXTRACT_SYSTEM 的 "核心证明复现" 部分末尾加入：
+"对于每个函子构造，必须明确写出：定义域、陪域、映射规则（用公式）、以及它是如何与其他构造交互的。"
+```
+
+**想要更精简的输出：**
+
+在 `EXTRACT_SYSTEM` 末尾把 Layer 1/2 字数限制改小，例如：
+```python
+"- Layer 1 控制在 200-300 词，Layer 2 控制在 500-800 词"
+```
+
+**想要更严格的批判：**
+
+在 `CRITIQUE_SYSTEM` 的审查清单中新增条目，例如：
+```python
+"7. **符号一致性**：笔记中使用的记号是否与原文完全一致？同一对象在不同地方是否用了不同符号？"
+```
+
+**想要针对特定领域调整：**
+
+`domains/` 目录下的 YAML 文件可以添加更多 `context_hints` 和 `critical_assumptions`，这些会自动注入到 Stage 1 和 Stage 2 的 prompt 中，不需要修改 `prompts.py`。
 
 ---
 
