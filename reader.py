@@ -106,21 +106,26 @@ def read_pdf(file_path: str) -> PaperDocument:
     for page in doc:
         pages_text.append(page.get_text())
     full_text = "\n".join(pages_text)
-    doc.close()
 
     paper = PaperDocument(
         full_text=full_text,
         source_path=file_path,
     )
 
-    # 尝试提取标题（通常是第一页的第一行大字）
     paper.title = _extract_title(pages_text[0] if pages_text else "")
-
-    # 尝试提取摘要
     paper.abstract = _extract_abstract(full_text)
 
-    # 解析 Section 结构
-    paper.sections = _parse_sections(full_text, pages_text)
+    # 优先使用 PDF 内嵌书签（绝大多数 arXiv 论文都有）
+    embedded_toc = doc.get_toc()
+    doc.close()
+
+    if embedded_toc:
+        page_offsets = _build_page_offsets(pages_text)
+        paper.sections = _locate_sections_from_embedded_toc(
+            embedded_toc, pages_text, page_offsets, full_text
+        )
+    else:
+        paper.sections = _parse_sections(full_text, pages_text)
 
     return paper
 
@@ -221,6 +226,63 @@ def _extract_abstract(text: str) -> str:
         if match:
             return match.group(1).strip()
     return ""
+
+
+def _locate_sections_from_embedded_toc(
+    toc_entries: list, pages_text: list, page_offsets: list, full_text: str
+) -> list:
+    """
+    用 PyMuPDF doc.get_toc() 返回的内嵌书签构建 Section 列表。
+    toc_entries: [(level, title, page_1based), ...]
+    每个 section 的内容范围 = [该 section 起始, 下一 section 起始)。
+    """
+    # 排序（通常已有序，保险起见）
+    entries = sorted(toc_entries, key=lambda e: e[2])
+
+    # 为每个 entry 找到在 full_text 中的精确起始字符偏移
+    # 策略：在目标页（±1页容差）内搜索标题文本
+    char_starts = []
+    for level, title, page_1based in entries:
+        page_idx = max(0, page_1based - 1)  # 转 0-based
+        search_start = page_offsets[max(0, page_idx - 1)]
+        if page_idx + 2 < len(page_offsets):
+            search_end = page_offsets[page_idx + 2]
+        else:
+            search_end = len(full_text)
+
+        # 用前 50 个字符做模糊定位（避免换行截断的长标题）
+        title_key = title[:50]
+        found = full_text.find(title_key, search_start, search_end)
+        if found == -1:
+            found = full_text.find(title_key)  # 放宽到全文
+        if found == -1:
+            found = page_offsets[page_idx]     # 最后兜底：用页首
+
+        char_starts.append(found)
+
+    # 构建 Section 对象
+    sections = []
+    for i, (level, title, page_1based) in enumerate(entries):
+        start_off = char_starts[i]
+        end_off = char_starts[i + 1] if i + 1 < len(entries) else len(full_text)
+
+        # 内容从标题行之后开始（跳过标题那一行）
+        title_end = full_text.find('\n', start_off)
+        content_start = (title_end + 1) if title_end > start_off else start_off
+        content = full_text[content_start:end_off].strip()
+
+        end_page = entries[i + 1][2] - 1 if i + 1 < len(entries) else len(pages_text)
+
+        sections.append(Section(
+            id=f"sec{i + 1}",
+            title=title,
+            level=level,
+            content=content,
+            page_start=page_1based,
+            page_end=end_page,
+        ))
+
+    return sections
 
 
 def _parse_sections(full_text: str, pages_text: list) -> list:
