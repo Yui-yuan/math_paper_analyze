@@ -1,8 +1,9 @@
-"""三阶段 Pipeline + 自迭代循环 + 收敛判定"""
+"""三阶段 Pipeline + 自迭代循环 + 收敛判定 + 断点续跑"""
 
 import re
 import json
 import hashlib
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 from dataclasses import dataclass, field
@@ -39,14 +40,17 @@ class PipelineResult:
     research_questions: str = ""   # Stage 4 生成的研究突破问题
 
 
-def run_pipeline(paper: PaperDocument, config: AppConfig) -> PipelineResult:
+def run_pipeline(paper: PaperDocument, config: AppConfig, resume_mode: str = "auto") -> PipelineResult:
     """
-    运行完整的三阶段 Pipeline。
+    运行完整的三阶段 Pipeline，支持断点续跑。
 
     流程：
     1. 粗读：提取骨架 → Stage 1 生成 Layer 1 + 标记精读 Section
     2. 精读：加载关键 Section → Stage 1 补充 Layer 2/3
-    3. 自迭代：[Stage 2 批判 → Stage 3 修正] × N 轮
+    3. 自迭代：[Stage 2 批判 → Stage 3 修正] × N 轮（每步独立保存断点）
+    4. Stage 4（可选）：研究突破问题生成
+
+    resume_mode: "auto"（检测断点并询问）/ "resume"（直接续跑）/ "fresh"（强制重头）
     """
     result = PipelineResult()
     domain_data = load_domain(config.domain) if config.domain else None
@@ -57,201 +61,205 @@ def run_pipeline(paper: PaperDocument, config: AppConfig) -> PipelineResult:
     cache_dir = Path(config.cache_dir)
     cache_dir.mkdir(parents=True, exist_ok=True)
 
-    # ---- 预估 Token 消耗 ----
-    _show_token_estimate(paper, config)
+    # ---- 断点检测与恢复 ----
+    cp = _handle_checkpoint(cache_dir, paper, resume_mode)
+    resume_stage = cp["stage"] if cp else None
+    saved = cp["state"] if cp else {}
 
-    # ---- Stage 1: 第一遍粗读 ----
-    console.print("\n[bold cyan][Stage 1 - 粗读][/bold cyan] 提取论文骨架...")
-
-    skeleton = paper.get_skeleton()
-
-    # 检查预算，如果骨架太大就截断
-    skeleton = truncate_to_budget(skeleton, config.token_budget.extract.input_max)
-
-    system_prompt = format_prompt(
-        EXTRACT_SYSTEM,
-        domain_hints=domain_hints,
-        language=language,
-    )
-    user_prompt = format_prompt(
-        EXTRACT_USER_FIRST_PASS,
-        skeleton=skeleton,
-    )
-
-    first_pass_output = call_llm(
-        model=config.models.extract,
-        system_prompt=system_prompt,
-        user_prompt=user_prompt,
-        config=config,
-        max_tokens=config.token_budget.extract.output_max,
-    )
-
-    result.total_input_tokens += estimate_tokens(system_prompt + user_prompt)
-    result.total_output_tokens += estimate_tokens(first_pass_output)
-
-    # 解析模型输出，提取 Layer 1 和需要精读的 Section 列表
-    layer1, sections_to_read = _parse_first_pass(first_pass_output, paper)
+    # 从 checkpoint 恢复状态
+    layer1            = saved.get("layer1", "")
+    sections_to_read  = saved.get("sections_to_read", [])
+    current_summary   = saved.get("current_summary", "")
+    last_critique     = saved.get("last_critique", "")
+    previous_critique = saved.get("previous_critique", "")
+    result.critique_history    = list(saved.get("critique_history", []))
+    result.rounds_completed    = saved.get("rounds_completed", 0)
+    result.total_input_tokens  = saved.get("total_input_tokens", 0)
+    result.total_output_tokens = saved.get("total_output_tokens", 0)
     result.layer1 = layer1
 
-    console.print(f"  Layer 1 生成完毕，标记了 {len(sections_to_read)} 个 Section 需要精读")
+    # 构建骨架和 system prompt（各阶段共用）
+    system_prompt = format_prompt(EXTRACT_SYSTEM, domain_hints=domain_hints, language=language)
+    skeleton = truncate_to_budget(paper.get_skeleton(), config.token_budget.extract.input_max)
 
-    # ---- Stage 1: 第二遍精读 ----
-    if config.optimization.two_pass_reading and sections_to_read:
-        console.print("[bold cyan][Stage 1 - 精读][/bold cyan] 加载关键 Section...")
+    # ---- 预估 Token（仅首次运行时显示）----
+    if resume_stage is None:
+        _show_token_estimate(paper, config)
 
-        # 标记核心 section
-        for sec in paper.sections:
-            sec.is_core = sec.id in sections_to_read
-
-        deep_read_text = paper.get_core_sections_text()
-        deep_read_text = truncate_to_budget(
-            deep_read_text,
-            config.token_budget.extract.input_max - estimate_tokens(layer1) - 200
-        )
-
-        user_prompt_2 = format_prompt(
-            EXTRACT_USER_SECOND_PASS,
-            layer1=layer1,
-            deep_read_sections=deep_read_text,
-            max_proofs=str(config.output.max_layer3_proofs),
-        )
-
-        second_pass_output = call_llm(
-            model=config.models.extract,
-            system_prompt=system_prompt,
-            user_prompt=user_prompt_2,
-            config=config,
+    # ==================================================
+    # Stage 1 - 粗读（First Pass）
+    # ==================================================
+    if resume_stage is None:
+        console.print("\n[bold cyan][Stage 1 - 粗读][/bold cyan] 提取论文骨架...")
+        user_prompt = format_prompt(EXTRACT_USER_FIRST_PASS, skeleton=skeleton)
+        first_pass_output = call_llm(
+            model=config.models.extract, system_prompt=system_prompt,
+            user_prompt=user_prompt, config=config,
             max_tokens=config.token_budget.extract.output_max,
         )
-
-        result.total_input_tokens += estimate_tokens(system_prompt + user_prompt_2)
-        result.total_output_tokens += estimate_tokens(second_pass_output)
-
-        # 合并两遍的输出
-        current_summary = _merge_passes(layer1, second_pass_output)
-        console.print("  Layer 2/3 生成完毕")
+        result.total_input_tokens  += estimate_tokens(system_prompt + user_prompt)
+        result.total_output_tokens += estimate_tokens(first_pass_output)
+        layer1, sections_to_read = _parse_first_pass(first_pass_output, paper)
+        result.layer1 = layer1
+        console.print(f"  Layer 1 生成完毕，标记了 {len(sections_to_read)} 个 Section 需要精读")
+        _save_checkpoint(cache_dir, paper, "first_pass", result, {
+            "layer1": layer1, "sections_to_read": sections_to_read,
+            "current_summary": "", "last_critique": "", "previous_critique": "",
+        })
     else:
-        # 不做两遍读，直接用第一遍输出
-        current_summary = first_pass_output
+        console.print(f"\n[dim][Stage 1 - 粗读] 已跳过（断点: {resume_stage}）[/dim]")
+        result.layer1 = layer1
 
-    # ---- 缓存中间结果 ----
-    if config.optimization.cache_intermediates:
-        _save_cache(cache_dir, paper, "stage1", current_summary)
-
-    # ---- 自迭代: Stage 2 批判 + Stage 3 修正 ----
-    max_rounds = config.pipeline.max_rounds
-    threshold = config.pipeline.convergence_threshold
-    previous_critique = ""
-
-    for round_num in range(1, max_rounds + 1):
-        console.print(f"\n[bold yellow][Round {round_num}/{max_rounds}][/bold yellow] 批判审查中...")
-
-        # Stage 2: 批判
-        critique_system = format_prompt(
-            CRITIQUE_SYSTEM,
-            domain_assumptions=domain_assumptions,
-            language=language,
-        )
-
-        if round_num == 1:
-            # 第一轮：全面批判
-            core_sections_text = paper.get_core_sections_text()
-            core_sections_text = truncate_to_budget(
-                core_sections_text,
-                config.token_budget.critique.input_max - estimate_tokens(current_summary) - 500
+    # ==================================================
+    # Stage 1 - 精读（Second Pass）
+    # ==================================================
+    if resume_stage in (None, "first_pass"):
+        if config.optimization.two_pass_reading and sections_to_read:
+            console.print("[bold cyan][Stage 1 - 精读][/bold cyan] 加载关键 Section...")
+            for sec in paper.sections:
+                sec.is_core = sec.id in sections_to_read
+            deep_read_text = truncate_to_budget(
+                paper.get_core_sections_text(),
+                config.token_budget.extract.input_max - estimate_tokens(layer1) - 200,
             )
-
-            critique_user = format_prompt(
-                CRITIQUE_USER_FULL,
-                skeleton=truncate_to_budget(skeleton, 1000),
-                core_sections=core_sections_text,
-                summary=current_summary,
+            user_prompt_2 = format_prompt(
+                EXTRACT_USER_SECOND_PASS, layer1=layer1,
+                deep_read_sections=deep_read_text,
+                max_proofs=str(config.output.max_layer3_proofs),
             )
+            second_pass_output = call_llm(
+                model=config.models.extract, system_prompt=system_prompt,
+                user_prompt=user_prompt_2, config=config,
+                max_tokens=config.token_budget.extract.output_max,
+            )
+            result.total_input_tokens  += estimate_tokens(system_prompt + user_prompt_2)
+            result.total_output_tokens += estimate_tokens(second_pass_output)
+            current_summary = _merge_passes(layer1, second_pass_output)
+            console.print("  Layer 2/3 生成完毕")
         else:
-            # 后续轮次：增量批判
-            critique_user = format_prompt(
-                CRITIQUE_USER_INCREMENTAL,
-                previous_critique=previous_critique,
-                revised_parts=current_summary,
-            )
-
-        critique_output = call_llm(
-            model=config.models.critique,
-            system_prompt=critique_system,
-            user_prompt=critique_user,
-            config=config,
-            max_tokens=config.token_budget.critique.output_max,
-        )
-
-        result.total_input_tokens += estimate_tokens(critique_system + critique_user)
-        result.total_output_tokens += estimate_tokens(critique_output)
-        result.critique_history.append(critique_output)
-
-        # 计算问题数量
-        issue_count = _count_issues(critique_output)
-        console.print(f"  发现 {issue_count} 个问题")
-
-        # 收敛判定
-        if issue_count <= threshold:
-            console.print(f"  [green]收敛！问题数 ({issue_count}) ≤ 阈值 ({threshold})[/green]")
-            result.rounds_completed = round_num
-            break
-
-        # Stage 3: 修正
-        console.print(f"[bold green][Round {round_num}/{max_rounds}][/bold green] 修正中...")
-
-        synthesize_system = format_prompt(
-            SYNTHESIZE_SYSTEM,
-            language=language,
-        )
-        synthesize_user = format_prompt(
-            SYNTHESIZE_USER,
-            current_summary=current_summary,
-            critique=critique_output,
-        )
-
-        revised_output = call_llm(
-            model=config.models.synthesize,
-            system_prompt=synthesize_system,
-            user_prompt=synthesize_user,
-            config=config,
-            max_tokens=config.token_budget.synthesize.output_max,
-        )
-
-        result.total_input_tokens += estimate_tokens(synthesize_system + synthesize_user)
-        result.total_output_tokens += estimate_tokens(revised_output)
-
-        current_summary = revised_output
-        previous_critique = critique_output
-        result.rounds_completed = round_num
-
-        # 缓存
-        if config.optimization.cache_intermediates:
-            _save_cache(cache_dir, paper, f"round{round_num}", current_summary)
-
-        console.print("  修正完毕")
+            current_summary = layer1
+        _save_checkpoint(cache_dir, paper, "second_pass", result, {
+            "layer1": layer1, "sections_to_read": sections_to_read,
+            "current_summary": current_summary, "last_critique": "", "previous_critique": "",
+        })
     else:
-        console.print(f"  [yellow]达到最大轮数 ({max_rounds})，停止迭代[/yellow]")
+        console.print(f"[dim][Stage 1 - 精读] 已跳过（断点: {resume_stage}）[/dim]")
+
+    # ==================================================
+    # 迭代：Stage 2 批判 + Stage 3 修正
+    # ==================================================
+    max_rounds = config.pipeline.max_rounds
+    threshold  = config.pipeline.convergence_threshold
+    critique_system   = format_prompt(CRITIQUE_SYSTEM, domain_assumptions=domain_assumptions, language=language)
+    synthesize_system = format_prompt(SYNTHESIZE_SYSTEM, language=language)
+
+    # 根据 resume_stage 决定从哪轮开始、是否跳过首轮批判
+    start_round, skip_first_critique = _parse_resume_round(resume_stage)
+    iterations_already_done = (start_round is None)
+
+    if not iterations_already_done:
+        for round_num in range(start_round, max_rounds + 1):
+            console.print(f"\n[bold yellow][Round {round_num}/{max_rounds}][/bold yellow] 批判审查中...")
+
+            # ---- Stage 2: 批判 ----
+            if skip_first_critique and round_num == start_round:
+                # 该轮批判已完成，直接使用断点中保存的结果
+                console.print(f"  [dim]批判结果已从断点加载，跳过重新批判[/dim]")
+                critique_output = last_critique
+                skip_first_critique = False
+            else:
+                if round_num == 1:
+                    core_sections_text = truncate_to_budget(
+                        paper.get_core_sections_text(),
+                        config.token_budget.critique.input_max - estimate_tokens(current_summary) - 500,
+                    )
+                    critique_user = format_prompt(
+                        CRITIQUE_USER_FULL,
+                        skeleton=truncate_to_budget(skeleton, 1000),
+                        core_sections=core_sections_text,
+                        summary=current_summary,
+                    )
+                else:
+                    critique_user = format_prompt(
+                        CRITIQUE_USER_INCREMENTAL,
+                        previous_critique=previous_critique,
+                        revised_parts=current_summary,
+                    )
+                critique_output = call_llm(
+                    model=config.models.critique, system_prompt=critique_system,
+                    user_prompt=critique_user, config=config,
+                    max_tokens=config.token_budget.critique.output_max,
+                )
+                result.total_input_tokens  += estimate_tokens(critique_system + critique_user)
+                result.total_output_tokens += estimate_tokens(critique_output)
+                # 保存批判断点
+                _save_checkpoint(cache_dir, paper, f"round_{round_num}_critique", result, {
+                    "layer1": layer1, "sections_to_read": sections_to_read,
+                    "current_summary": current_summary,
+                    "last_critique": critique_output,
+                    "previous_critique": previous_critique,
+                })
+
+            result.critique_history.append(critique_output)
+            issue_count = _count_issues(critique_output)
+            console.print(f"  发现 {issue_count} 个问题")
+
+            # 收敛判定
+            if issue_count <= threshold:
+                console.print(f"  [green]收敛！问题数 ({issue_count}) ≤ 阈值 ({threshold})[/green]")
+                result.rounds_completed = round_num
+                break
+
+            # ---- Stage 3: 修正 ----
+            console.print(f"[bold green][Round {round_num}/{max_rounds}][/bold green] 修正中...")
+            synthesize_user = format_prompt(
+                SYNTHESIZE_USER, current_summary=current_summary, critique=critique_output,
+            )
+            revised_output = call_llm(
+                model=config.models.synthesize, system_prompt=synthesize_system,
+                user_prompt=synthesize_user, config=config,
+                max_tokens=config.token_budget.synthesize.output_max,
+            )
+            result.total_input_tokens  += estimate_tokens(synthesize_system + synthesize_user)
+            result.total_output_tokens += estimate_tokens(revised_output)
+            current_summary   = revised_output
+            previous_critique = critique_output
+            result.rounds_completed = round_num
+            # 保存修正断点
+            _save_checkpoint(cache_dir, paper, f"round_{round_num}_synthesize", result, {
+                "layer1": layer1, "sections_to_read": sections_to_read,
+                "current_summary": current_summary,
+                "last_critique": "", "previous_critique": previous_critique,
+            })
+            console.print("  修正完毕")
+        else:
+            console.print(f"  [yellow]达到最大轮数 ({max_rounds})，停止迭代[/yellow]")
+
+    # 保存"迭代全部完成"断点
+    _save_checkpoint(cache_dir, paper, "done_iterations", result, {
+        "layer1": layer1, "sections_to_read": sections_to_read,
+        "current_summary": current_summary,
+        "last_critique": "", "previous_critique": previous_critique,
+    })
 
     # ---- 组装最终结果 ----
     result.full_notes = current_summary
-
-    # 尝试拆分 layers
     result.layer1, result.layer2, result.layer3, result.appendix = _split_layers(current_summary)
 
-    # ---- Stage 4: 研究突破点提问（可选）----
-    if config.research_questions_enabled:
+    # ==================================================
+    # Stage 4: 研究突破点提问（可选）
+    # ==================================================
+    if config.research_questions_enabled and resume_stage != "research_questions":
         console.print("\n[bold magenta][Stage 4][/bold magenta] 生成研究突破问题...")
         result.research_questions = _generate_research_questions(result.full_notes, config)
-        result.total_input_tokens += estimate_tokens(result.full_notes)
+        result.total_input_tokens  += estimate_tokens(result.full_notes)
         result.total_output_tokens += estimate_tokens(result.research_questions)
         console.print("  研究问题生成完毕")
 
-    total_cost = estimate_cost(
-        config.models.extract,
-        result.total_input_tokens,
-        result.total_output_tokens,
-    )
+    # ---- Pipeline 全部完成：删除断点文件 ----
+    _delete_checkpoint(cache_dir, paper)
+
+    total_cost = estimate_cost(config.models.extract, result.total_input_tokens, result.total_output_tokens)
     console.print(f"\n[bold]Pipeline 完成[/bold]")
     console.print(f"  迭代轮数: {result.rounds_completed}")
     console.print(f"  总 token: ~{result.total_input_tokens + result.total_output_tokens}")
@@ -260,7 +268,114 @@ def run_pipeline(paper: PaperDocument, config: AppConfig) -> PipelineResult:
     return result
 
 
-# ---- 辅助函数 ----
+# ---- 断点辅助函数 ----
+
+def _checkpoint_path(cache_dir: Path, paper: PaperDocument) -> Path:
+    paper_hash = hashlib.md5(paper.source_path.encode()).hexdigest()[:8]
+    return cache_dir / f"{paper_hash}_checkpoint.json"
+
+
+def _save_checkpoint(cache_dir: Path, paper: PaperDocument, stage: str,
+                     result: "PipelineResult", extra: dict):
+    """将当前 pipeline 状态序列化为 checkpoint JSON 文件。"""
+    state = {
+        "layer1":            extra.get("layer1", ""),
+        "sections_to_read":  extra.get("sections_to_read", []),
+        "current_summary":   extra.get("current_summary", ""),
+        "last_critique":     extra.get("last_critique", ""),
+        "previous_critique": extra.get("previous_critique", ""),
+        "critique_history":  list(result.critique_history),
+        "rounds_completed":  result.rounds_completed,
+        "total_input_tokens":  result.total_input_tokens,
+        "total_output_tokens": result.total_output_tokens,
+    }
+    checkpoint = {
+        "paper_hash": hashlib.md5(paper.source_path.encode()).hexdigest()[:8],
+        "paper_name": paper.title or Path(paper.source_path).name,
+        "stage":     stage,
+        "timestamp": datetime.now().isoformat(timespec="seconds"),
+        "state":     state,
+    }
+    path = _checkpoint_path(cache_dir, paper)
+    path.write_text(json.dumps(checkpoint, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _load_checkpoint(cache_dir: Path, paper: PaperDocument) -> Optional[dict]:
+    path = _checkpoint_path(cache_dir, paper)
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def _delete_checkpoint(cache_dir: Path, paper: PaperDocument):
+    path = _checkpoint_path(cache_dir, paper)
+    if path.exists():
+        path.unlink()
+
+
+def _handle_checkpoint(cache_dir: Path, paper: PaperDocument, resume_mode: str) -> Optional[dict]:
+    """
+    检测 checkpoint 文件，根据 resume_mode 决定续跑或重头。
+    返回 checkpoint dict（续跑）或 None（重头）。
+    """
+    cp = _load_checkpoint(cache_dir, paper)
+    if cp is None:
+        return None
+
+    stage      = cp.get("stage", "?")
+    timestamp  = cp.get("timestamp", "?")
+    rounds     = cp.get("state", {}).get("rounds_completed", 0)
+
+    console.print(f"\n[bold yellow]⚡ 发现断点记录[/bold yellow]")
+    console.print(f"  论文     : {cp.get('paper_name', '?')}")
+    console.print(f"  已完成阶段: [cyan]{stage}[/cyan]")
+    console.print(f"  已完成轮数: {rounds}")
+    console.print(f"  保存时间 : {timestamp}")
+
+    if resume_mode == "resume":
+        console.print("  [green]--resume：自动续跑[/green]\n")
+        return cp
+    if resume_mode == "fresh":
+        console.print("  [yellow]--fresh：删除断点，重新开始[/yellow]\n")
+        _delete_checkpoint(cache_dir, paper)
+        return None
+
+    # auto：交互询问
+    try:
+        answer = input("\n是否从断点续跑？[Y/n] ").strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        return None
+
+    if answer in ("n", "no", "否"):
+        _delete_checkpoint(cache_dir, paper)
+        return None
+    return cp
+
+
+def _parse_resume_round(resume_stage: Optional[str]) -> tuple:
+    """
+    根据 resume_stage 返回 (start_round, skip_first_critique)。
+    start_round=None 表示迭代循环已全部完成，可直接跳到 Stage 4。
+    skip_first_critique=True 表示该轮批判已完成，只需运行修正。
+    """
+    if resume_stage is None or resume_stage in ("first_pass", "second_pass"):
+        return 1, False
+    if resume_stage == "done_iterations":
+        return None, False
+    m = re.match(r"round_(\d+)_(critique|synthesize)", resume_stage)
+    if m:
+        n, step = int(m.group(1)), m.group(2)
+        if step == "critique":
+            return n, True   # 批判完成 → 续跑本轮修正
+        else:
+            return n + 1, False  # 修正完成 → 进入下一轮
+    return 1, False
+
+
+# ---- 其他辅助函数 ----
 
 def _show_token_estimate(paper: PaperDocument, config: AppConfig):
     """显示 token 消耗预估"""
@@ -412,8 +527,3 @@ def _generate_research_questions(full_notes: str, config: AppConfig) -> str:
         return f"[研究问题生成失败: {e}]"
 
 
-def _save_cache(cache_dir: Path, paper: PaperDocument, stage: str, content: str):
-    """缓存中间结果"""
-    paper_hash = hashlib.md5(paper.source_path.encode()).hexdigest()[:8]
-    cache_file = cache_dir / f"{paper_hash}_{stage}.md"
-    cache_file.write_text(content, encoding='utf-8')

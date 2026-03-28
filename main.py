@@ -89,6 +89,18 @@ def main():
         help="跳过研讨模式",
     )
 
+    resume_group = parser.add_mutually_exclusive_group()
+    resume_group.add_argument(
+        "--resume",
+        action="store_true",
+        help="发现断点时自动续跑，不询问",
+    )
+    resume_group.add_argument(
+        "--fresh",
+        action="store_true",
+        help="忽略断点，强制从头开始",
+    )
+
     parser.add_argument(
         "--research-questions",
         action="store_true",
@@ -235,7 +247,8 @@ def main():
 
     # Step 3: 运行 Pipeline
     console.print("\n[bold]Step 3:[/bold] 运行分析 Pipeline...")
-    result = run_pipeline(paper, config)
+    resume_mode = "resume" if args.resume else "fresh" if args.fresh else "auto"
+    result = run_pipeline(paper, config, resume_mode=resume_mode)
 
     # Step 4: 导出笔记
     console.print("\n[bold]Step 4:[/bold] 导出笔记...")
