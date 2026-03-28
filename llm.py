@@ -5,6 +5,41 @@ from typing import Optional
 
 from config import AppConfig, ProviderConfig, resolve_provider
 
+# 各模型的最大输出 token 上限（超出会报 400 错误）
+# 调用时自动取 min(config 设的值, 模型实际上限)，未知模型使用默认值
+MODEL_MAX_OUTPUT = {
+    # Gemini
+    "gemini/gemini-3.1-pro-preview":        65536,
+    "gemini/gemini-3.1-flash-lite-preview": 65536,
+    "gemini/gemini-2.5-pro":                65536,
+    "gemini/gemini-2.5-flash":              65536,
+    "gemini/gemini-2.5-flash-lite":         65536,
+    "gemini/gemini-2.0-flash":              65536,
+    # DeepSeek
+    "deepseek/deepseek-chat":               8192,
+    "deepseek/deepseek-reasoner":           16000,
+    # OpenAI
+    "openai/gpt-5.4":                       16384,
+    "openai/gpt-5.4-mini":                  16384,
+    # Anthropic（原生 SDK，单独处理）
+    "anthropic/claude-opus-4-6":            32768,
+    "anthropic/claude-sonnet-4-6":          32768,
+    "anthropic/claude-haiku-4-5-20251001":  32768,
+    # Moonshot
+    "moonshot/kimi-k2.5":                   8192,
+    # MiniMax
+    "minimax/MiniMax-M2.7":                 16384,
+}
+_DEFAULT_MAX_OUTPUT = 16384  # 未知模型的安全默认值
+
+
+def _clamp_max_tokens(model: str, requested: Optional[int]) -> Optional[int]:
+    """返回实际应传给 API 的 max_tokens：min(请求值, 模型上限)。"""
+    limit = MODEL_MAX_OUTPUT.get(model, _DEFAULT_MAX_OUTPUT)
+    if requested is None:
+        return limit
+    return min(requested, limit)
+
 
 def _get_api_key(provider: ProviderConfig) -> str:
     """从环境变量获取 API key"""
@@ -131,6 +166,7 @@ def _route_call(
     """根据 provider 路由到对应的调用方式"""
     provider, model_only = resolve_provider(model, config)
     api_key = _get_api_key(provider)
+    actual_max = _clamp_max_tokens(model, max_tokens)
 
     if not provider.compatible_mode:
         # Anthropic 原生 SDK
@@ -139,7 +175,7 @@ def _route_call(
             system_prompt=system_prompt,
             messages=messages,
             api_key=api_key,
-            max_tokens=max_tokens or 4096,
+            max_tokens=actual_max,
             temperature=temperature,
         )
     else:
@@ -150,7 +186,7 @@ def _route_call(
             messages=messages,
             api_key=api_key,
             base_url=provider.base_url,
-            max_tokens=max_tokens,
+            max_tokens=actual_max,
             temperature=temperature,
         )
 
